@@ -32,7 +32,9 @@ class TelSock:
                 # write back the id
                 await self.ws.send("id"+len(self.tns))
             print(message)
-            self.tn.write("{}\n".format(message).encode())
+            # strip out the id
+            parts = message.split("--")
+            self.tns[int(parts[0])].write("{}\n".format(parts[1]).encode())
 
     def start_read_eventloop(self):
         # this is the function we target with the thread because its not async, but will make the asyncio happen in the other thread

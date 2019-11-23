@@ -92,6 +92,7 @@ class Client {
     }
 
     automove(text) {
+        // shift to all tn messages going through an identifier
         if (/automove/.exec(text)) {
             if (!this.automoveswitch) {
                 this.automoveswitch = true
@@ -145,7 +146,7 @@ class Client {
             if (this.automove(e.target.value)) {
                 console.log("automoving")
             } else {
-                this.ws.send(e.target.value)
+                this.ws.send(`${this.telnetID}--${e.target.value}`)
             }
             e.target.value = ""
         }
