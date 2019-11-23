@@ -78,11 +78,11 @@ class Client {
         this.ta.addEventListener("scroll", (e) => {
             // figure out what the position is of the scroll, and if its not 1 windows height down, enable a flag that stops us from tracking to the bottom when more stuff comes in
             console.log("scrolling")
-            console.log("height",this.ta.scrollHeight)
-            console.log("top",this.ta.scrollTop)
-            let percentage = (this.ta.scrollTopMax - this.ta.scrollTop)/this.ta.scrollTopMax
-            console.log("percentage",percentage)
-            if (percentage > 0 )  {
+            console.log("height", this.ta.scrollHeight)
+            console.log("top", this.ta.scrollTop)
+            let percentage = (this.ta.scrollTopMax - this.ta.scrollTop) / this.ta.scrollTopMax
+            console.log("percentage", percentage)
+            if (percentage > 0) {
                 console.log("locking")
                 this.stayBottomLocked = false
             } else {
@@ -114,13 +114,26 @@ class Client {
     }
     socketSetup() {
         this.ws = new WebSocket("ws://localhost:8765")
+        this.ws.onopen = (e) => {
+            // send thhe register request
+            // retrieve and associate with the id
+            this.ws.send("register")
+        }
         this.ws.onmessage = (e) => {
-            this.updateTextArea(e.data)
-            if (this.ta.value.length > 10000) {
-                this.ta.value = this.ta.value.slice(1500)
+            // if its a id response associate with attribute on this
+            if (/id(\d+)/.exec(e.data)) {
+                this.telnetID = /id(\d+)/.exec(e.data)[1]
             }
-            if (this.stayBottomLocked) {
-                this.ta.scrollTop = this.ta.scrollHeight
+            // only update with correct info
+            let text = /(\d+)--(.*)/.exec(e.data)
+            if (text && text[1] == this.telnetID) {
+                this.updateTextArea(text[2])
+                if (this.ta.value.length > 10000) {
+                    this.ta.value = this.ta.value.slice(1500)
+                }
+                if (this.stayBottomLocked) {
+                    this.ta.scrollTop = this.ta.scrollHeight
+                }
             }
         }
     }
