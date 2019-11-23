@@ -45,7 +45,7 @@ class TelSock:
         while True:
             ## go over the tns we have to listen on
             if self.thread_up:
-            for tn in self.tns:
+            for i,tn in enumerate(self.tns):
                 contents = tn.read_until(b"\n", .2).decode("utf-8")
                 if not contents == "":
                     ansi_escape = re.compile(r'''
@@ -57,7 +57,7 @@ class TelSock:
                     ''', re.VERBOSE)
                     result = ansi_escape.sub('', contents)
                     print(result)
-                    await self.ws.send(result)
+                    await self.ws.send("{}--{}".format(i,result))
 
 
 ts = TelSock(tn)
