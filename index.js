@@ -24,11 +24,15 @@ class Combat {
                     this.target = enemy
                     return `kill ${enemy}`
                 }
+                // look for the line A ... 
+                if (/A (\w+)/.exec(text)) {
+                    this.fighting = true
+                }
             }
         }
         // this stuff should occur during
         // this ends the fight
-        if (/corpse/.exec(text) || /They aren't here/.exec(text)) {
+        if (/R\.I\.P\./.exec(text) || /They don't seem to be here./.exec(text)) {
             this.fighting = false
         }
     }
@@ -58,6 +62,7 @@ class Exit {
 // create the websocket
 class Client {
     constructor() {
+        this.travel = []
         this.combat = new Combat()
         this.exit = new Exit()
         this.ta = document.createElement("textarea")
@@ -91,6 +96,10 @@ class Client {
         })
     }
 
+    randDir() {
+        let ind = Math.floor(Math.random() * 4)
+        return "nesw".slice(ind, ind + 1)
+    }
     automove(text) {
         // shift to all tn messages going through an identifier
         if (/automove/.exec(text)) {
@@ -124,25 +133,121 @@ class Client {
             // if its a id response associate with attribute on this
             if (/id(\d+)/.exec(e.data)) {
                 this.telnetID = /id(\d+)/.exec(e.data)[1]
+                console.log("telnet id is", this.telnetID)
+            } else {
+                let text = /(\d+)--(.*)/.exec(e.data)
+                console.log(text)
+                if (text && text[1] == this.telnetID) {
+                    this.updateTextArea(`\n${text[2]}`)
+                    if (this.ta.value.length > 10000) {
+                        this.ta.value = this.ta.value.slice(1500)
+                    }
+                    if (this.stayBottomLocked) {
+                        this.ta.scrollTop = this.ta.scrollHeight
+                    }
+                }
             }
             // only update with correct info
-            let text = /(\d+)--(.*)/.exec(e.data)
-            if (text && text[1] == this.telnetID) {
-                this.updateTextArea(text[2])
-                if (this.ta.value.length > 10000) {
-                    this.ta.value = this.ta.value.slice(1500)
+        }
+    }
+    idsend(s) {
+        this.ws.send(`${this.telnetID}--${s}`)
+    }
+    // give autochop both input line and mud text
+    autochop(s) {
+        if (/autochop/.exec(s)) {
+            //initiate a mover or chopper with state tracking
+            this.autochopstate = "moving"
+            // start tracking
+            this.checkDir("ftrack")
+            this.chopint = setInterval(() => {
+                this.idsend("l")
+                this.idsend("i")
+                if (this.autochopstate != "chopping") {
+                    this.idsend("chop")
                 }
-                if (this.stayBottomLocked) {
-                    this.ta.scrollTop = this.ta.scrollHeight
-                }
+            }, 2000)
+        }
+        if (/chop.../.exec(s)) {
+            this.autochopstate= "chopping"
+        }
+        if (/crack/.exec(s)) {
+            this.autochopstate = "stopped"
+            this.idsend("stop")
+        }
+        if (/A Forest/.exec(s)) {
+            // this is the too low level, should move
+            let dir = this.randDir()
+            this.checkDir(dir)
+            this.idsend(dir)
+        }
+        if (/(\d*)\/25 items/.exec(s)) {
+            let amt = parseInt(/(\d*)\/25 items/.exec(s)[1])
+            if (amt > 20) {
+                // trigger the backtrack
+                this.checkDir("backtrack")
             }
+        }
+        // if you wind up at the lumberyard, 
+        if (/A Lumber Yard/.exec(s)) {
+            this.idsend("store all.tree")
+            this.checkDir("ftrack")
+        }
+        if (/can't really chop/.exec(s)) {
+            // wrong place, rand dir now
+            let dir = this.randDir()
+            this.checkDir(dir)
+            this.idsend(dir)
+        }
+        // forces input up to surface that can trigger either moves, backtracks or
+        if (/stopchop/.exec(s)) {
+            clearInterval(this.chopint)
+        }
+
+
+    }
+    checkDir(s) {
+        // setup tracking or not
+        if (/ftrack/.exec(s)) {
+            this.track = true
+        }
+        if (this.track) {
+            switch (s) {
+                case "n":
+                    this.travel.push("s")
+                    break
+                case "s":
+                    this.travel.push("n")
+                    break
+                case "e":
+                    this.travel.push("w")
+                    break
+                case "w":
+                    this.travel.push("e")
+                    break
+            }
+        }
+        if (/backtrack/.exec(s)) {
+            // create a timer and a removal event that pops directions from the stack to return 
+            let int = setInterval(() => {
+                if (this.travel.length == 0) {
+                    clearInterval(int)
+                    this.track = false
+                }
+                this.ws.send(`${this.telnetID}--${this.travel.pop()}`)
+            }, 2000)
+
         }
     }
     sendInput(e) {
         console.log(e.key)
         if (e.key == "Enter") {
             // check for combat elements
+            // target is the input line at the bottom we should say 
             this.combat.parseCommand(e.target.value)
+            // dir check
+            this.checkDir(e.target.value)
+            this.autochop(e.target.value)
             if (this.automove(e.target.value)) {
                 console.log("automoving")
             } else {
@@ -153,10 +258,11 @@ class Client {
     }
     updateTextArea(t) {
         this.ta.value += t
+        this.autochop(t)
         let autoResponse = this.combat.search(t)
         this.exit.search(t)
         if (autoResponse) {
-            this.ws.send(autoResponse)
+            this.ws.send(`${this.telnetID}--${autoResponse}`)
         }
     }
 
@@ -200,7 +306,7 @@ let Mazer = () => {
             }
             dirInd = Math.floor(Math.random() * 4)
             console.log(dirInd)
-            let selectOpt = options.splice(dirInd, 1)
+            let selectOpt = options.slice(dirInd, dirInd + 1)
             newInds[0] = selectOpt[0]
             newInds[1] = selectOpt[1]
 
