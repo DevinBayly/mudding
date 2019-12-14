@@ -153,8 +153,33 @@ class Client {
     idsend(s) {
         this.ws.send(`${this.telnetID}--${s}`)
     }
+    autodig(s) {
+        if (/autodig.*/.exec(s)) {
+            this.digint = setInterval(() => {
+                //move south
+                let parts = /autodig (.*) (\d+)/.exec(s)
+                let dirs = parts[1].split(" ")
+
+                for (let step of dirs ) {
+                    this.idsend(step)
+                }
+                this.idsend("store all")
+                for (let step of dirs ) {
+                    this.idsend(this.invert(step))
+                }
+                this.idsend("dig")
+            }, )
+        }
+        if (/stopdig/.exec(s)) {
+            clearInterval(this.digint)
+        }
+
+    }
     // give autochop both input line and mud text
     autochop(s) {
+        if (this.hardcount != undefined) {
+            this.hardcount += 1
+        }
         if (/autochop/.exec(s)) {
             //initiate a mover or chopper with state tracking
             this.autochopstate = "moving"
@@ -163,28 +188,31 @@ class Client {
             this.chopint = setInterval(() => {
                 this.idsend("l")
                 this.idsend("i")
-                if (this.autochopstate != "chopping") {
+                if (this.autochopstate != "chopping" && this.autochopstate != "backtracking") {
                     this.idsend("chop")
                 }
-            }, 2000)
+            }, 5000)
         }
-        if (/chop.../.exec(s)) {
-            this.autochopstate= "chopping"
+        if (/hard\!/.exec(s)) {
+            this.hardcount = 0
+        }
+        if (this.hardcount > 150) {
+            // assume that we are in the wrong state, as in chopping but actually stopped
+            this.autochopstate = "stopped"
+        }
+        if (/chop\.\.\./.exec(s)) {
+            this.autochopstate = "chopping"
         }
         if (/crack/.exec(s)) {
             this.autochopstate = "stopped"
             this.idsend("stop")
         }
-        if (/A Forest/.exec(s)) {
-            // this is the too low level, should move
-            let dir = this.randDir()
-            this.checkDir(dir)
-            this.idsend(dir)
-        }
         if (/(\d*)\/25 items/.exec(s)) {
             let amt = parseInt(/(\d*)\/25 items/.exec(s)[1])
             if (amt > 20) {
                 // trigger the backtrack
+                // set 
+                this.autochopstate = "backtracking"
                 this.checkDir("backtrack")
             }
         }
@@ -193,7 +221,7 @@ class Client {
             this.idsend("store all.tree")
             this.checkDir("ftrack")
         }
-        if (/can't really chop/.exec(s)) {
+        if (/can't really chop/.exec(s) && this.autochopstate != "backtracking") {
             // wrong place, rand dir now
             let dir = this.randDir()
             this.checkDir(dir)
@@ -212,20 +240,7 @@ class Client {
             this.track = true
         }
         if (this.track) {
-            switch (s) {
-                case "n":
-                    this.travel.push("s")
-                    break
-                case "s":
-                    this.travel.push("n")
-                    break
-                case "e":
-                    this.travel.push("w")
-                    break
-                case "w":
-                    this.travel.push("e")
-                    break
-            }
+
         }
         if (/backtrack/.exec(s)) {
             // create a timer and a removal event that pops directions from the stack to return 
@@ -239,6 +254,23 @@ class Client {
 
         }
     }
+    invert() {
+        switch (s) {
+            case "n":
+                return "s"
+                break
+            case "s":
+                return "n"
+                break
+            case "e":
+                return "w"
+                break
+            case "w":
+                return "e"
+                break
+        }
+    }
+
     sendInput(e) {
         console.log(e.key)
         if (e.key == "Enter") {
@@ -248,6 +280,7 @@ class Client {
             // dir check
             this.checkDir(e.target.value)
             this.autochop(e.target.value)
+            this.autodig(e.target.value)
             if (this.automove(e.target.value)) {
                 console.log("automoving")
             } else {
