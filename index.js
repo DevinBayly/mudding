@@ -1,3 +1,92 @@
+// could have a multi class now
+// with a timed char creation and random name and attribute selelction process
+let Maze = (dim) => {
+    // have a place to start
+    let ob = {}
+    ob.dim = dim
+    ob.array = Array(dim * dim).fill(0)
+    ob.done = false
+    ob.x = 0
+    ob.y = 0
+    ob.step_type = ""
+    ob.array[0] = 1
+    ob.selected = []
+    ob.path = []
+    ob.ind = (x, y) => {
+        return y * ob.dim + x
+    }
+    ob.check = (x, y) => {
+        if (x < 0 || y < 0) {
+            return false
+        }
+        if (x >= dim || y >= dim) {
+            return false
+        }
+        if (ob.array[ob.ind(x, y)] == 1) {
+            return false
+        }
+        return true
+    }
+    ob.step = () => {
+        let opts = []
+        let chosen
+        let x = ob.x
+        let y = ob.y
+        for (let shift of [-1, 1]) {
+            if (ob.check(x + shift, y)) {
+                opts.push([shift, 0])
+            }
+            if (ob.check(x, y + shift)) {
+                opts.push([0, shift])
+            }
+        }
+        // handle if opts is still 0 length
+        if (opts.length == 0) {
+            if (ob.path.length == 0) {
+                ob.done = true
+                return
+            }
+            chosen = ob.path.pop()[0]
+            chosen = [-chosen[0], -chosen[1]]
+            ob.step_type = "backtrack"
+        } else {
+            let select = Math.floor(Math.random() * opts.length)
+            chosen = opts.splice(select, 1)[0]
+            ob.path.push([chosen])
+            console.log(ob.path)
+            ob.step_type = "forward"
+        }
+
+        ob.selected[0] = chosen[0]
+        ob.selected[1] = chosen[1]
+
+    }
+    ob.pprint = () => {
+        for (let x = 0; x < dim; x++) {
+            console.log(ob.array.slice(x * dim, (x + 1) * dim))
+        }
+        console.log("end print")
+    }
+    ob.approveMove = (b) => {
+        if (b || ob.step_type == "backtrack") {
+            // make the old index into a 1
+            let ind = ob.ind(ob.x, ob.y)
+            ob.array[ind] = 1
+            // new index into a 2
+            ob.x += ob.selected[0]
+            ob.y += ob.selected[1]
+            ind = ob.ind(ob.x, ob.y)
+            ob.array[ind] = 2
+        } else {
+            console.log("not approved")
+            // push selected back onto the path stack
+        }
+
+    }
+
+    return ob
+}
+
 class Combat {
     constructor() {
         this.fighting = false
@@ -95,7 +184,11 @@ class Client {
             }
         })
     }
-
+    run(move_string) {
+        for (let c of move_string) {
+            this.idsend(c)
+        }
+    }
     randDir() {
         let ind = Math.floor(Math.random() * 4)
         return "nesw".slice(ind, ind + 1)
@@ -135,23 +228,19 @@ class Client {
                 this.telnetID = /id(\d+)/.exec(e.data)[1]
                 console.log("telnet id is", this.telnetID)
             } else {
-                let text = /(\d+)--(.*)/.exec(e.data)
-                console.log(text)
-                if (text && text[1] == this.telnetID) {
-                    this.updateTextArea(`\n${text[2]}`)
-                    if (this.ta.value.length > 10000) {
-                        this.ta.value = this.ta.value.slice(1500)
-                    }
-                    if (this.stayBottomLocked) {
-                        this.ta.scrollTop = this.ta.scrollHeight
-                    }
+                this.updateTextArea(`\n${e.data}`)
+                if (this.ta.value.length > 10000) {
+                    this.ta.value = this.ta.value.slice(1500)
+                }
+                if (this.stayBottomLocked) {
+                    this.ta.scrollTop = this.ta.scrollHeight
                 }
             }
-            // only update with correct info
         }
+        // only update with correct info
     }
     idsend(s) {
-        this.ws.send(`${this.telnetID}--${s}`)
+        this.ws.send(`${s}`)
     }
     autodig(s) {
         if (/autodig.*/.exec(s)) {
@@ -160,15 +249,15 @@ class Client {
                 let parts = /autodig (.*) (\d+)/.exec(s)
                 let dirs = parts[1].split(" ")
 
-                for (let step of dirs ) {
+                for (let step of dirs) {
                     this.idsend(step)
                 }
                 this.idsend("store all")
-                for (let step of dirs ) {
+                for (let step of dirs) {
                     this.idsend(this.invert(step))
                 }
                 this.idsend("dig")
-            }, )
+            })
         }
         if (/stopdig/.exec(s)) {
             clearInterval(this.digint)
@@ -177,36 +266,6 @@ class Client {
     }
     // give autochop both input line and mud text
     autochop(s) {
-        if (this.hardcount != undefined) {
-            this.hardcount += 1
-        }
-        if (/autochop/.exec(s)) {
-            //initiate a mover or chopper with state tracking
-            this.autochopstate = "moving"
-            // start tracking
-            this.checkDir("ftrack")
-            this.chopint = setInterval(() => {
-                this.idsend("l")
-                this.idsend("i")
-                if (this.autochopstate != "chopping" && this.autochopstate != "backtracking") {
-                    this.idsend("chop")
-                }
-            }, 5000)
-        }
-        if (/hard\!/.exec(s)) {
-            this.hardcount = 0
-        }
-        if (this.hardcount > 150) {
-            // assume that we are in the wrong state, as in chopping but actually stopped
-            this.autochopstate = "stopped"
-        }
-        if (/chop\.\.\./.exec(s)) {
-            this.autochopstate = "chopping"
-        }
-        if (/crack/.exec(s)) {
-            this.autochopstate = "stopped"
-            this.idsend("stop")
-        }
         if (/(\d*)\/25 items/.exec(s)) {
             let amt = parseInt(/(\d*)\/25 items/.exec(s)[1])
             if (amt > 20) {
@@ -216,31 +275,108 @@ class Client {
                 this.checkDir("backtrack")
             }
         }
+        //chop causes commands: chop
+        if (/Commands: chop,/.exec(s)) {
+            this.idsend("chop")
+            this.autochopstate = "chopping"
+        }
+
+        //stop causes nothing here to chop,stop causes need to lead to further steps
+        if (/nothing left/.exec(s)) {
+            this.autochopstate = "notchopping"
+        }
+
         // if you wind up at the lumberyard, 
         if (/A Lumber Yard/.exec(s)) {
-            this.idsend("store all.tree")
+            this.idsend("store all")
             this.checkDir("ftrack")
         }
-        if (/can't really chop/.exec(s) && this.autochopstate != "backtracking") {
-            // wrong place, rand dir now
-            let dir = this.randDir()
-            this.checkDir(dir)
-            this.idsend(dir)
-        }
-        // forces input up to surface that can trigger either moves, backtracks or
-        if (/stopchop/.exec(s)) {
-            clearInterval(this.chopint)
+        if (/startchop/.exec(s)) {
+            // create maze, take step()
         }
 
 
     }
+    // a map is 15 units wide 15 tall
+    // meaning 7 lines above user on 8th and 7 lines below
+    storeMap(s) {
+        if (/\+[\s\S]+\+/.exec(s)) {
+            this.map = /\+[\s\S]+\+/.exec(s)[0]
+        }
+    }
+    // sotr the lumber list for overall distance, and pop the first, convert to run units. each time this function is run we will recompute, no need to compose a map once and then do it over and over
+    calcLumber() {
+        this.lumberlist = []
+        if (this.map) {
+            let lines = this.map.split("\n")
+            // drop top and bottom parts
+            lines = lines.slice(1,-1)
+            for (let y = 0;y < lines.length;y++) {
+                //break into parts
+                let line = lines[y].slice(1,-2) // remove the | chars on either end of line
+                let x = 0
+                while (x < line.length-4) {
+                    let tile  = line.slice(x,x+4)
+                    console.log(tile)
+                    if (/\^/.exec(tile)) {
+                        // convert to units and put in lumber list
+                        this.lumberlist.push([x/4-7,y-7])
+                        console.log("lumber at ",this.lumberlist[this.lumberlist.length-1])
+                    }
+                    x+=4
+                }
+            }
+        }
+    }
+    convert_dirs(pair) {
+        let x = pair[0]
+        let y = pair[1]
+        let x_dir,y_dir
+        if (x > 0) {
+            x_dir = "e".repeat(x)
+        } else {
+            x_dir = "w".repeat(-x)
+        }
+        if (y > 0) {
+            y_dir = "s".repeat(y)
+        } else {
+            y_dir = "n".repeat(-y)
+        }
+        return [x_dir,y_dir]
+    }
     checkDir(s) {
+        // calculate lumber list, make character for lumber list general 
+        if (/gochop/.exec(s)) {
+            // take the top element of the lumber list, convert to run, then run
+            let choice = this.lumberlist[0]
+            console.log(choice,"is choice")
+            let dirs = this.convert_dirs(choice)
+            console.log(dirs)
+            this.run(dirs[0]+dirs[1])
+
+
+
+        }
+        if (/calclist/.exec(s)) {
+            this.calcLumber()
+            // sort the list for 0s first
+            this.lumberlist.sort((f,s)=> {
+                return (Math.abs(f[0]) + Math.abs(f[1])) > (Math.abs(s[0]) + Math.abs(s[1]))
+            })
+            console.log(this.lumberlist)
+        }
         // setup tracking or not
+        if (/run (.*)/.exec(s)) {
+            this.run(/run (.*)/.exec(s)[1])
+        }
         if (/ftrack/.exec(s)) {
             this.track = true
         }
         if (this.track) {
-
+            // store entries
+            if ("nesw".indexOf(s) != -1) {
+                this.travel.push(this.invert(s))
+            }
         }
         if (/backtrack/.exec(s)) {
             // create a timer and a removal event that pops directions from the stack to return 
@@ -249,12 +385,12 @@ class Client {
                     clearInterval(int)
                     this.track = false
                 }
-                this.ws.send(`${this.telnetID}--${this.travel.pop()}`)
+                this.ws.send(`${this.travel.pop()}`)
             }, 2000)
 
         }
     }
-    invert() {
+    invert(s) {
         switch (s) {
             case "n":
                 return "s"
@@ -284,7 +420,7 @@ class Client {
             if (this.automove(e.target.value)) {
                 console.log("automoving")
             } else {
-                this.ws.send(`${this.telnetID}--${e.target.value}`)
+                this.ws.send(`${e.target.value}`)
             }
             e.target.value = ""
         }
@@ -292,6 +428,7 @@ class Client {
     updateTextArea(t) {
         this.ta.value += t
         this.autochop(t)
+        this.storeMap(t)
         let autoResponse = this.combat.search(t)
         this.exit.search(t)
         if (autoResponse) {
