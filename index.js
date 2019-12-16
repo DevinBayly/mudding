@@ -171,13 +171,8 @@ class Client {
     scrollControl() {
         this.ta.addEventListener("scroll", (e) => {
             // figure out what the position is of the scroll, and if its not 1 windows height down, enable a flag that stops us from tracking to the bottom when more stuff comes in
-            console.log("scrolling")
-            console.log("height", this.ta.scrollHeight)
-            console.log("top", this.ta.scrollTop)
             let percentage = (this.ta.scrollTopMax - this.ta.scrollTop) / this.ta.scrollTopMax
-            console.log("percentage", percentage)
             if (percentage > 0) {
-                console.log("locking")
                 this.stayBottomLocked = false
             } else {
                 this.stayBottomLocked = true
@@ -185,6 +180,15 @@ class Client {
         })
     }
     run(move_string) {
+        if (/\d+/.exec(move_string)) {
+            let matches = move_string.match(/\d+\w/g)
+            move_string =""
+            for (let m of matches) {
+                //20w for instance
+                let num = parseInt(m)
+                move_string += m.slice(-1).repeat(num)
+            }
+        }
         for (let c of move_string) {
             this.idsend(c)
         }
@@ -202,7 +206,6 @@ class Client {
                     if (!this.combat.fighting) {
                         let pick = this.exit.selectExit()
                         if (pick) {
-                            console.log("moving ", pick)
                             this.ws.send(pick)
                         }
                     }
@@ -264,35 +267,62 @@ class Client {
         }
 
     }
+    bumpChop(){
+            if (this.corrector) {
+                clearInterval(this.corrector)
+            }
+            this.corrector = setInterval(()=>{
+                this.idsend("say nothing left")
+            },20*1000)
+    }
     // give autochop both input line and mud text
     autochop(s) {
+        if (/chopon/.exec(s)) {
+            this.chopon = true
+        }
         if (/(\d*)\/25 items/.exec(s)) {
             let amt = parseInt(/(\d*)\/25 items/.exec(s)[1])
             if (amt > 20) {
                 // trigger the backtrack
                 // set 
-                this.autochopstate = "backtracking"
-                this.checkDir("backtrack")
+                // calc list for LL and goget
+                this.checkDir("calclist LL")
+                this.checkDir("goget")
             }
         }
         //chop causes commands: chop
         if (/Commands: chop,/.exec(s)) {
-            this.idsend("chop")
+            if (this.autochopstate!= "chopping")
+            this.idsend("gather")
             this.autochopstate = "chopping"
+        }
+        if (/axe hard!/.exec(s)) {
+            this.bumpChop()
         }
 
         //stop causes nothing here to chop,stop causes need to lead to further steps
         if (/nothing left/.exec(s)) {
             this.autochopstate = "notchopping"
+            this.checkDir("calclist \\^")
+            this.checkDir("goget")
+            this.bumpChop()
+        }
+        if (/crack/.exec(s)) {
+            // if we crack check for inventory
+            this.idsend("i")
+            this.bumpChop()
         }
 
         // if you wind up at the lumberyard, 
         if (/A Lumber Yard/.exec(s)) {
             this.idsend("store all")
-            this.checkDir("ftrack")
-        }
-        if (/startchop/.exec(s)) {
-            // create maze, take step()
+            this.autochopstate="notchopping"
+            // establish new map from s
+            this.storeMap(s)
+            this.checkDir("calclist \\^")
+            this.checkDir("goget")
+            // trigger and clear
+            this.bumpChop()
         }
 
 
@@ -305,25 +335,26 @@ class Client {
         }
     }
     // sotr the lumber list for overall distance, and pop the first, convert to run units. each time this function is run we will recompute, no need to compose a map once and then do it over and over
-    calcLumber() {
-        this.lumberlist = []
+    calcList(glyph) {
+        this.loclist = []
         if (this.map) {
             let lines = this.map.split("\n")
             // drop top and bottom parts
-            lines = lines.slice(1,-1)
-            for (let y = 0;y < lines.length;y++) {
+            lines = lines.slice(1, -1)
+            for (let y = 0; y < lines.length; y++) {
                 //break into parts
-                let line = lines[y].slice(1,-2) // remove the | chars on either end of line
+                let line = lines[y].slice(1, -2) // remove the | chars on either end of line
                 let x = 0
-                while (x < line.length-4) {
-                    let tile  = line.slice(x,x+4)
+                while (x < line.length - 4) {
+                    let tile = line.slice(x, x + 4)
                     console.log(tile)
-                    if (/\^/.exec(tile)) {
+                    let reg = new RegExp(glyph)
+                    if (reg.exec(tile)) {
                         // convert to units and put in lumber list
-                        this.lumberlist.push([x/4-7,y-7])
-                        console.log("lumber at ",this.lumberlist[this.lumberlist.length-1])
+                        this.loclist.push([x / 4 - 7, y - 7])
+                        console.log("element at ", this.loclist[this.loclist.length - 1])
                     }
-                    x+=4
+                    x += 4
                 }
             }
         }
@@ -331,7 +362,7 @@ class Client {
     convert_dirs(pair) {
         let x = pair[0]
         let y = pair[1]
-        let x_dir,y_dir
+        let x_dir, y_dir
         if (x > 0) {
             x_dir = "e".repeat(x)
         } else {
@@ -342,28 +373,29 @@ class Client {
         } else {
             y_dir = "n".repeat(-y)
         }
-        return [x_dir,y_dir]
+        return [x_dir, y_dir]
     }
     checkDir(s) {
         // calculate lumber list, make character for lumber list general 
-        if (/gochop/.exec(s)) {
+        if (/goget/.exec(s)) {
             // take the top element of the lumber list, convert to run, then run
-            let choice = this.lumberlist[0]
-            console.log(choice,"is choice")
+            let choice = this.loclist[0]
+            console.log(choice, "is choice")
             let dirs = this.convert_dirs(choice)
             console.log(dirs)
-            this.run(dirs[0]+dirs[1])
+            this.run(dirs[0] + dirs[1])
 
 
 
         }
-        if (/calclist/.exec(s)) {
-            this.calcLumber()
+        if (/calclist (.*)/.exec(s)) {
+            let glyph = /calclist (.*)/.exec(s)[1]
+            this.calcList(glyph)
             // sort the list for 0s first
-            this.lumberlist.sort((f,s)=> {
+            this.loclist.sort((f, s) => {
                 return (Math.abs(f[0]) + Math.abs(f[1])) > (Math.abs(s[0]) + Math.abs(s[1]))
             })
-            console.log(this.lumberlist)
+            console.log(this.loclist)
         }
         // setup tracking or not
         if (/run (.*)/.exec(s)) {
@@ -408,7 +440,6 @@ class Client {
     }
 
     sendInput(e) {
-        console.log(e.key)
         if (e.key == "Enter") {
             // check for combat elements
             // target is the input line at the bottom we should say 
@@ -427,7 +458,10 @@ class Client {
     }
     updateTextArea(t) {
         this.ta.value += t
-        this.autochop(t)
+        if (this.chopon) {
+            this.autochop(t)
+
+        }
         this.storeMap(t)
         let autoResponse = this.combat.search(t)
         this.exit.search(t)
