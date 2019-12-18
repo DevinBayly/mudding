@@ -218,6 +218,18 @@ class Client {
         }
         return false
     }
+    repeat(s) {
+        if (/rp (\d+) "(.*)"/.exec(s)) {
+            let matches = /rp (\d+) "(.*)"/.exec(s)
+            let commands = matches[2].split(";")
+            for (let i = 0 ; i< parseInt(matches[1]);i++) {
+                for (let com of commands) {
+
+                    this.idsend(com)
+                }
+            }
+        }
+    }
     socketSetup() {
         this.ws = new WebSocket("ws://localhost:8765")
         this.ws.onopen = (e) => {
@@ -278,7 +290,12 @@ class Client {
     // give autochop both input line and mud text
     autochop(s) {
         if (/chopon/.exec(s)) {
+            if(this.chopon) {
+                this.chopon =!this.chopon
+            }else {
             this.chopon = true
+            }
+
         }
         if (/(\d*)\/25 items/.exec(s)) {
             let amt = parseInt(/(\d*)\/25 items/.exec(s)[1])
@@ -445,6 +462,7 @@ class Client {
             // target is the input line at the bottom we should say 
             this.combat.parseCommand(e.target.value)
             // dir check
+            this.repeat(e.target.value)
             this.checkDir(e.target.value)
             this.autochop(e.target.value)
             this.autodig(e.target.value)

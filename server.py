@@ -1,55 +1,38 @@
-#!/usr/bin/env python
 import asyncio
+import re
 import websockets
 import telnetlib
-import threading
-import re
+import subprocess as sp
+import os
 
-# so we actually have to store a list of telnets, and when we start, let the first message be an identifying message sent to the client, that it must preface all other ones with
-# connection is made, echo is called message is "handshake", tn is created, and pushed into stack, and readloop threadstarted ws responds to the client with a ID number that must go in front of other messages,then that index is used to find the correct tn session and comm with it
-# must add supprt to decipher which client should respond to the message in the onmessage part
+## start up the client  page
+proc = sp.Popen("python -m http.server".split(" "),cwd=os.getcwd())
+proc2 = sp.Popen("firefox --browser --new-window localhost:8000".split(" "),cwd=os.getcwd())
 
-
-class TelSock:
+class Trimmed:
     def __init__(self):
-        self.host = "localhost"
-        self.port = "4000"
-        self.thread_up = False
-        self.tns = []
+        self.pairs = {}
 
-   async def echo(self, websocket, path):
-        self.ws = websocket
+    async def echo(self, websocket, path):
+        # need a list of the websockets
         # sending ws to tn
-
         async for message in websocket:
-            if "register" in message[:len("register")]:
-                # initialize the tn
-                temp_tn = telnetlib.Telnet(self.host,self.port)
-                self.tns.append(temp_tn)
-                if not self.thread_up:
-                    threading.Thread(target=self.start_read_eventloop).start()
-                    self.thread_up = True
-                # write back the id
-                await self.ws.send("id"+len(self.tns))
-            print(message)
-            # strip out the id
-            parts = message.split("--")
-            self.tns[int(parts[0])].write("{}\n".format(parts[1]).encode())
+            if message == "register":
+                task = asyncio.create_task(self.connection(websocket))
+            print("got ", message)
+            # get the tn
+            if self.pairs.get(websocket, -1) != -1:
+                bytes_message = "{}\n".format(message.strip()).encode()
+                self.pairs[websocket].write(bytes_message)
 
-    def start_read_eventloop(self):
-        # this is the function we target with the thread because its not async, but will make the asyncio happen in the other thread
-        asyncio.run(self.read_loop())
-
-    async def read_loop(self):
-        print("in readloop")
-        print(self.ws)
-        # sending tn to ws
+    async def connection(self, ws):
+        tn = telnetlib.Telnet("localhost", 4000)
+        # create an entry for the telnet
+        self.pairs[ws] = tn
         while True:
-            ## go over the tns we have to listen on
-            if self.thread_up:
-            for i,tn in enumerate(self.tns):
-                contents = tn.read_until(b"\n", .2).decode("utf-8")
-                if not contents == "":
+            try:
+                contents = tn.read_very_eager()
+                if contents != b"":
                     ansi_escape = re.compile(r'''
                         \x1B    # ESC
                         [@-_]   # 7-bit C1 Fe
@@ -57,15 +40,16 @@ class TelSock:
                         [ -/]*  # Intermediate bytes
                         [@-~]   # Final byte
                     ''', re.VERBOSE)
-                    result = ansi_escape.sub('', contents)
+                    result = ansi_escape.sub('', contents.decode())
                     print(result)
-                    await self.ws.send("{}--{}".format(i,result))
+                    await ws.send(result)
+                await asyncio.sleep(.5)
+            except EOFError:
+                tn = telnetlib.Telnet("localhost", 4000)
+                self.pairs[ws] = tn
 
-
-ts = TelSock(tn)
+t = Trimmed()
 
 asyncio.get_event_loop().run_until_complete(
-    websockets.serve(ts.echo, 'localhost', 8765))
-
-
+    websockets.serve(t.echo, "localhost", 8765))
 asyncio.get_event_loop().run_forever()
