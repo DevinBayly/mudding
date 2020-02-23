@@ -243,7 +243,7 @@ class Client {
                 this.telnetID = /id(\d+)/.exec(e.data)[1]
                 console.log("telnet id is", this.telnetID)
             } else {
-                this.updateTextArea(`\n${e.data}`)
+                this.updateTextArea(`${e.data}`)
                 if (this.ta.value.length > 10000) {
                     this.ta.value = this.ta.value.slice(1500)
                 }
