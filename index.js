@@ -231,7 +231,7 @@ class Client {
         }
     }
     socketSetup() {
-        this.ws = new WebSocket("ws://localhost:8765")
+        this.ws = new WebSocket(`ws://${location.hostname.replace(/http:\/\//,"").replace(/8000/,"8765")}`)
         this.ws.onopen = (e) => {
             // send thhe register request
             // retrieve and associate with the id

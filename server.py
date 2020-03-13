@@ -7,7 +7,7 @@ import os
 
 ## start up the client  page
 proc = sp.Popen("python -m http.server".split(" "),cwd=os.getcwd())
-proc2 = sp.Popen("firefox --browser --new-window localhost:8000".split(" "),cwd=os.getcwd())
+##proc2 = sp.Popen("firefox --browser --new-window localhost:8000".split(" "),cwd=os.getcwd())
 
 class Trimmed:
     def __init__(self):
@@ -51,5 +51,5 @@ class Trimmed:
 t = Trimmed()
 
 asyncio.get_event_loop().run_until_complete(
-    websockets.serve(t.echo, "localhost", 8765))
+    websockets.serve(t.echo, "0.0.0.0", 8765))
 asyncio.get_event_loop().run_forever()
