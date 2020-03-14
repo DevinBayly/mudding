@@ -19,13 +19,14 @@ class Trimmed:
         # sending ws to tn
         print("starting echo")
         async for message in websocket:
-            if message == "register":
-                task = asyncio.create_task(self.connection(websocket))
-            print("got ", message)
-            # get the tn
-            if self.pairs.get(websocket, -1) != -1:
-                bytes_message = "{}\n".format(message.strip()).encode()
-                await self.pairs[websocket].write(bytes_message)
+            await websocket.write("reply "+message)
+           # if message == "register":
+           #     task = asyncio.create_task(self.connection(websocket))
+           # print("got ", message)
+           # # get the tn
+           # if self.pairs.get(websocket, -1) != -1:
+           #     bytes_message = "{}\n".format(message.strip()).encode()
+           #     await self.pairs[websocket].write(bytes_message)
 
     async def connection(self, ws):
         await ws.write("connection happening".encode())
