@@ -4,17 +4,20 @@ import websockets
 import telnetlib
 import subprocess as sp
 import os
-
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 print("starting ws")
 ## start up the client  page
 
 class Trimmed:
     def __init__(self):
         self.pairs = {}
+        print("made pairs")
 
     async def echo(self, websocket, path):
         # need a list of the websockets
         # sending ws to tn
+        print("starting echo")
         async for message in websocket:
             if message == "register":
                 task = asyncio.create_task(self.connection(websocket))
@@ -25,6 +28,7 @@ class Trimmed:
                 self.pairs[websocket].write(bytes_message)
 
     async def connection(self, ws):
+        print("building connection")
         tn = telnetlib.Telnet("theforestsedge.com", 4000)
         # create an entry for the telnet
         self.pairs[ws] = tn
@@ -48,6 +52,12 @@ class Trimmed:
                 self.pairs[ws] = tn
 
 t = Trimmed()
-asyncio.get_event_loop().run_until_complete(
-    websockets.serve(t.echo, "0.0.0.0", 8765))
-asyncio.get_event_loop().run_forever()
+try:
+  asyncio.get_event_loop().run_until_complete(
+      websockets.serve(t.echo, "0.0.0.0", 8765))
+  print("started loop,now running forever")
+  asyncio.get_event_loop().run_forever()
+except KeyboardInterrupt:
+  pass
+finally:
+  asyncio.get_event_loop().close()
