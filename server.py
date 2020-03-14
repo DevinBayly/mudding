@@ -19,12 +19,17 @@ class Trimmed:
         # sending ws to tn
         print("starting echo")
         async for message in websocket:
-            await websocket.send("returning "+message)
+            if message == "register":
+                task = asyncio.create_task(self.connection(websocket))
+            print("got ", message)
+            # get the tn
+            if self.pairs.get(websocket, -1) != -1:
+                bytes_message = "{}\n".format(message.strip()).encode()
+                self.pairs[websocket].write(bytes_message)
 
     async def connection(self, ws):
-        self.ws = ws
         print("building connection")
-        tn = telnetlib.Telnet("coffeemud.net", 4000)
+        tn = telnetlib.Telnet("theforestsedge.com", 4000)
         # create an entry for the telnet
         self.pairs[ws] = tn
         while True:
