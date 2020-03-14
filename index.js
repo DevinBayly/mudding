@@ -182,7 +182,7 @@ class Client {
     run(move_string) {
         if (/\d+/.exec(move_string)) {
             let matches = move_string.match(/\d+\w/g)
-            move_string =""
+            move_string = ""
             for (let m of matches) {
                 //20w for instance
                 let num = parseInt(m)
@@ -222,7 +222,7 @@ class Client {
         if (/rp (\d+) "(.*)"/.exec(s)) {
             let matches = /rp (\d+) "(.*)"/.exec(s)
             let commands = matches[2].split(";")
-            for (let i = 0 ; i< parseInt(matches[1]);i++) {
+            for (let i = 0; i < parseInt(matches[1]); i++) {
                 for (let com of commands) {
 
                     this.idsend(com)
@@ -231,7 +231,7 @@ class Client {
         }
     }
     socketSetup() {
-        this.ws = new WebSocket(`ws://${location.hostname.replace(/http:\/\//,"").replace(/8000/,"8765")}`)
+        this.ws = new WebSocket(`ws://${document.querySelector("#wssel").value}`)
         this.ws.onopen = (e) => {
             // send thhe register request
             // retrieve and associate with the id
@@ -279,21 +279,21 @@ class Client {
         }
 
     }
-    bumpChop(){
-            if (this.corrector) {
-                clearInterval(this.corrector)
-            }
-            this.corrector = setInterval(()=>{
-                this.idsend("say nothing left")
-            },20*1000)
+    bumpChop() {
+        if (this.corrector) {
+            clearInterval(this.corrector)
+        }
+        this.corrector = setInterval(() => {
+            this.idsend("say nothing left")
+        }, 20 * 1000)
     }
     // give autochop both input line and mud text
     autochop(s) {
         if (/chopon/.exec(s)) {
-            if(this.chopon) {
-                this.chopon =!this.chopon
-            }else {
-            this.chopon = true
+            if (this.chopon) {
+                this.chopon = !this.chopon
+            } else {
+                this.chopon = true
             }
 
         }
@@ -309,8 +309,8 @@ class Client {
         }
         //chop causes commands: chop
         if (/Commands: chop,/.exec(s)) {
-            if (this.autochopstate!= "chopping")
-            this.idsend("gather")
+            if (this.autochopstate != "chopping")
+                this.idsend("gather")
             this.autochopstate = "chopping"
         }
         if (/axe hard!/.exec(s)) {
@@ -333,7 +333,7 @@ class Client {
         // if you wind up at the lumberyard, 
         if (/A Lumber Yard/.exec(s)) {
             this.idsend("store all")
-            this.autochopstate="notchopping"
+            this.autochopstate = "notchopping"
             // establish new map from s
             this.storeMap(s)
             this.checkDir("calclist \\^")
@@ -560,7 +560,16 @@ let Mazer = () => {
 
 
 window.onload = () => {
-    let client = new Client()
+    let input = document.createElement("input")
+    input.id = "wssel"
+    let btn = document.createElement("button")
+    btn.addEventListener("click", () => {
+        let client = new Client()
+    })
+    btn.innerHTML="submit"
+    document.body.append(input)
+    document.body.append(btn)
+
     // create mazer
     //let maze = Mazer()
     //maze.starting(20, 20)
