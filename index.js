@@ -458,19 +458,7 @@ class Client {
 
     sendInput(e) {
         if (e.key == "Enter") {
-            // check for combat elements
-            // target is the input line at the bottom we should say 
-            this.combat.parseCommand(e.target.value)
-            // dir check
-            this.repeat(e.target.value)
-            this.checkDir(e.target.value)
-            this.autochop(e.target.value)
-            this.autodig(e.target.value)
-            if (this.automove(e.target.value)) {
-                console.log("automoving")
-            } else {
-                this.ws.send(`${e.target.value}`)
-            }
+            this.ws.send(`${e.target.value}`)
             e.target.value = ""
         }
     }
@@ -566,7 +554,7 @@ window.onload = () => {
     btn.addEventListener("click", () => {
         let client = new Client()
     })
-    btn.innerHTML="submit"
+    btn.innerHTML = "submit"
     document.body.append(input)
     document.body.append(btn)
 
