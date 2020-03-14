@@ -24,7 +24,7 @@ class Trimmed:
     async def connection(self, ws):
         self.ws = ws
         print("building connection")
-        tn = telnetlib.Telnet("theforestsedge.com", 4000)
+        tn = telnetlib.Telnet("coffeemud.net", 4000)
         # create an entry for the telnet
         self.pairs[ws] = tn
         while True:
