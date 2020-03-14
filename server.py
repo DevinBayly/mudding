@@ -6,8 +6,6 @@ import subprocess as sp
 import os
 
 ## start up the client  page
-proc = sp.Popen("python -m http.server".split(" "),cwd=os.getcwd())
-##proc2 = sp.Popen("firefox --browser --new-window localhost:8000".split(" "),cwd=os.getcwd())
 
 class Trimmed:
     def __init__(self):
