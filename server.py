@@ -19,7 +19,7 @@ class Trimmed:
         # sending ws to tn
         print("starting echo")
         async for message in websocket:
-            self.ws.send("returning ",message)
+            await websocket.send("returning "+message)
 
     async def connection(self, ws):
         self.ws = ws
