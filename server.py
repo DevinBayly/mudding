@@ -5,6 +5,7 @@ import telnetlib
 import subprocess as sp
 import os
 
+print("starting ws")
 ## start up the client  page
 
 class Trimmed:
@@ -47,7 +48,6 @@ class Trimmed:
                 self.pairs[ws] = tn
 
 t = Trimmed()
-
 asyncio.get_event_loop().run_until_complete(
     websockets.serve(t.echo, "0.0.0.0", 8765))
 asyncio.get_event_loop().run_forever()
