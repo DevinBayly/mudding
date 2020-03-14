@@ -25,7 +25,7 @@ class Trimmed:
             # get the tn
             if self.pairs.get(websocket, -1) != -1:
                 bytes_message = "{}\n".format(message.strip()).encode()
-                self.pairs[websocket].write(bytes_message)
+                await self.pairs[websocket].write(bytes_message)
 
     async def connection(self, ws):
         print("building connection")
