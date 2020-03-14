@@ -28,6 +28,7 @@ class Trimmed:
                 await self.pairs[websocket].write(bytes_message)
 
     async def connection(self, ws):
+        await ws.write("connection happening".encode())
         print("building connection")
         tn = telnetlib.Telnet("theforestsedge.com", 4000)
         # create an entry for the telnet
